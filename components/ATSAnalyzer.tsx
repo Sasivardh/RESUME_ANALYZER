@@ -207,8 +207,8 @@ export default function ATSAnalyzer() {
       const newFiles: AttachedFile[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (file.size > 5 * 1024 * 1024) {
-          setError(`File ${file.name} is too large. Please upload files smaller than 5MB.`);
+        if (file.size > 10 * 1024 * 1024) {
+          setError(`File ${file.name} is too large. Please upload files smaller than 10MB.`);
           continue;
         }
         try {
@@ -222,8 +222,8 @@ export default function ATSAnalyzer() {
       setError(null);
     } else {
       const file = files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size too large. Please upload a file smaller than 5MB.');
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size too large. Please upload a file smaller than 10MB.');
         return;
       }
       try {
@@ -263,7 +263,13 @@ export default function ATSAnalyzer() {
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        setError('Gemini API Key is missing. Please ensure NEXT_PUBLIC_GEMINI_API_KEY is set in your environment variables.');
+        setLoading(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       
       const parts: any[] = [];
       
@@ -370,7 +376,13 @@ export default function ATSAnalyzer() {
     setBulkResults([]);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        setError('Gemini API Key is missing. Please ensure NEXT_PUBLIC_GEMINI_API_KEY is set in your environment variables.');
+        setBulkLoading(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const results: BulkResult[] = [];
 
       for (let i = 0; i < resumeFiles.length; i++) {
@@ -450,7 +462,13 @@ export default function ATSAnalyzer() {
     setRewriting(true);
     setRewrittenSection(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        setError('Gemini API Key is missing. Please ensure NEXT_PUBLIC_GEMINI_API_KEY is set in your environment variables.');
+        setRewriting(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       
       const parts: any[] = [];
       if (resumeFiles.length > 0) {
@@ -517,7 +535,13 @@ export default function ATSAnalyzer() {
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        setError('Gemini API Key is missing. Please ensure NEXT_PUBLIC_GEMINI_API_KEY is set in your environment variables.');
+        setGeneratingCL(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       
       const parts: any[] = [];
       
@@ -572,7 +596,13 @@ export default function ATSAnalyzer() {
     setGeneratingPrep(true);
     setError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        setError('Gemini API Key is missing. Please ensure NEXT_PUBLIC_GEMINI_API_KEY is set in your environment variables.');
+        setGeneratingPrep(false);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const parts: any[] = [];
 
       if (resumeFiles.length > 0) {
