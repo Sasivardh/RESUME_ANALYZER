@@ -1,0 +1,5 @@
+{
+  "name": "ATS Resume Analyzer",
+  "description": "Expert HR consultant tool to analyze resume match against job descriptions with scoring and keyword insights.",
+  "requestFramePermissions": []
+}
