@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { useTheme } from 'next-themes';
+import * as mammoth from 'mammoth';
 import { ATS_ANALYSIS_SCHEMA, SYSTEM_INSTRUCTION, COVER_LETTER_PROMPT } from '@/lib/constants';
 import HowItWorks from './HowItWorks';
 import ResumeTemplates from './ResumeTemplates';
@@ -83,6 +84,7 @@ interface AttachedFile {
   file: File;
   base64: string;
   mimeType: string;
+  extractedText?: string;
 }
 
 const CountUp = ({ end, duration = 2 }: { end: number; duration?: number }) => {
@@ -153,17 +155,47 @@ export default function ATSAnalyzer() {
 
   const fileToDataPart = async (file: File): Promise<AttachedFile> => {
     return new Promise((resolve, reject) => {
+      const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx');
       const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve({
-          file,
-          base64,
-          mimeType: file.type
-        });
+      
+      reader.onload = async () => {
+        try {
+          let base64 = '';
+          let extractedText = undefined;
+
+          if (isDocx) {
+            const arrayBuffer = reader.result as ArrayBuffer;
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            extractedText = result.value;
+            // We don't need base64 for DOCX as we send the extracted text
+            console.log(`Extracted text from DOCX: ${file.name} (${extractedText.length} chars)`);
+          } else {
+            base64 = (reader.result as string).split(',')[1];
+            console.log(`Processed file as base64: ${file.name} (${file.type})`);
+          }
+
+          resolve({
+            file,
+            base64,
+            mimeType: file.type || 'application/octet-stream',
+            extractedText
+          });
+        } catch (err) {
+          console.error('Error processing file:', err);
+          reject(err);
+        }
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      
+      reader.onerror = (err) => {
+        console.error('FileReader error:', err);
+        reject(err);
+      };
+      
+      if (isDocx) {
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -237,26 +269,35 @@ export default function ATSAnalyzer() {
       
       // Resume Part
       if (resumeFiles.length > 0) {
-        parts.push({
-          inlineData: {
-            data: resumeFiles[0].base64,
-            mimeType: resumeFiles[0].mimeType
-          }
-        });
-        parts.push({ text: "The above file is the candidate's RESUME." });
+        const file = resumeFiles[0];
+        if (file.extractedText) {
+          parts.push({ text: `RESUME TEXT (Extracted from ${file.file.name}):\n${file.extractedText}` });
+        } else {
+          parts.push({
+            inlineData: {
+              data: file.base64,
+              mimeType: file.mimeType
+            }
+          });
+          parts.push({ text: "The above file is the candidate's RESUME." });
+        }
       } else if (resume.trim()) {
         parts.push({ text: `RESUME TEXT:\n${resume}` });
       }
 
       // JD Part
       if (jdFile) {
-        parts.push({
-          inlineData: {
-            data: jdFile.base64,
-            mimeType: jdFile.mimeType
-          }
-        });
-        parts.push({ text: "The above file is the JOB DESCRIPTION." });
+        if (jdFile.extractedText) {
+          parts.push({ text: `JOB DESCRIPTION TEXT (Extracted from ${jdFile.file.name}):\n${jdFile.extractedText}` });
+        } else {
+          parts.push({
+            inlineData: {
+              data: jdFile.base64,
+              mimeType: jdFile.mimeType
+            }
+          });
+          parts.push({ text: "The above file is the JOB DESCRIPTION." });
+        }
       }
       if (jd.trim()) {
         parts.push({ text: `JOB DESCRIPTION TEXT:\n${jd}` });
@@ -341,21 +382,29 @@ export default function ATSAnalyzer() {
         if (i > 0) await sleep(5000);
 
         const parts: any[] = [];
-        parts.push({
-          inlineData: {
-            data: file.base64,
-            mimeType: file.mimeType
-          }
-        });
-        parts.push({ text: "The above file is the candidate's RESUME." });
-
-        if (jdFile) {
+        if (file.extractedText) {
+          parts.push({ text: `RESUME TEXT (Extracted from ${file.file.name}):\n${file.extractedText}` });
+        } else {
           parts.push({
             inlineData: {
-              data: jdFile.base64,
-              mimeType: jdFile.mimeType
+              data: file.base64,
+              mimeType: file.mimeType
             }
           });
+          parts.push({ text: "The above file is the candidate's RESUME." });
+        }
+
+        if (jdFile) {
+          if (jdFile.extractedText) {
+            parts.push({ text: `JOB DESCRIPTION TEXT (Extracted from ${jdFile.file.name}):\n${jdFile.extractedText}` });
+          } else {
+            parts.push({
+              inlineData: {
+                data: jdFile.base64,
+                mimeType: jdFile.mimeType
+              }
+            });
+          }
         }
         if (jd.trim()) {
           parts.push({ text: `JOB DESCRIPTION TEXT:\n${jd}` });
@@ -1074,7 +1123,7 @@ ${result.atsCompatibilityTips.map(t => `- ${t}`).join('\n')}
                   id="resume-upload"
                   className="hidden"
                   multiple
-                  accept="application/pdf,image/*"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
                   onChange={(e) => handleFileChange(e, 'resume')}
                 />
                 <label
@@ -1139,7 +1188,7 @@ ${result.atsCompatibilityTips.map(t => `- ${t}`).join('\n')}
                   type="file"
                   id="jd-upload"
                   className="hidden"
-                  accept="application/pdf,image/*"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
                   onChange={(e) => handleFileChange(e, 'jd')}
                 />
                 <label
